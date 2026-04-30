@@ -1,0 +1,37 @@
+// Combined Pine Script code for KAMA_SuperTrend, MTF_StochRSI, Auto_Fibs_Pivot, and Aydin_Indicator
+
+//@version=5
+indicator("Comprehensive Indicator", overlay = true)
+
+// KAMA SuperTrend Code
+var float kama = na
+fast = input(2, title="Fast Period")
+slow = input(30, title="Slow Period")
+
+delta = math.abs(close - close[1])
+
+// calculate KAMA
+kama := na(kama[1]) ? close : kama[1] + (delta < 0 ? close - kama[1] : 0)
+
+// MTF StochRSI code
+stochRsiLength = input(14, title="Stoch RSI Length")
+src = close
+rsiValue = ta.rsi(src, stochRsiLength)
+stochRsi = (rsiValue - ta.lowest(rsiValue, stochRsiLength)) / (ta.highest(rsiValue, stochRsiLength) - ta.lowest(rsiValue, stochRsiLength))
+
+// Auto Fibs Pivot code
+fibLevel1 = input(0.236, "Fib Level 1")
+fibLevel2 = input(0.618, "Fib Level 2")
+// Pivot calculation
+pivotHigh = highest(high, 14)
+pivotLow = lowest(low, 14)
+
+// Aydin Indicator Placeholder
+plot(kama, title="KAMA", color=color.blue)
+
+plot(stochRsi, title="Stoch RSI", color=color.red)
+
+// Additional plotting for Fibonacci Levels
+hline(pivotHigh * fibLevel1, "Fib Level 1", color=color.green)
+hline(pivotLow * fibLevel2, "Fib Level 2", color=color.orange)
+
