@@ -1,37 +1,863 @@
-// Combined Pine Script code for KAMA_SuperTrend, MTF_StochRSI, Auto_Fibs_Pivot, and Aydin_Indicator
-
-//@version=5
-indicator("Comprehensive Indicator", overlay = true)
-
-// KAMA SuperTrend Code
+/@version=6
+indicator("Aydın"
+, overlay=true)
+auc = ta.ema(math.max(close - close[1], 0),
+27)
+adc = ta.ema(math.max(close[1] - close, 0),
+27)
+x1 = 13 * (adc * 70 / 30 - auc)
+bU = x1 >= 0 ? close + x1 : close + x1 * 30 /
+70
+x2 = 13 * (adc * 30 / 70 - auc)
+bL = x2 >= 0 ? close + x2 : close + x2 * 70 /
+30
+f_lbl(float p, string t, color c) =>
+var line l = na
+var label lb = na
+if barstate.islast and not na(p)
+line.delete(l)
+label.delete(lb)
+l := line.new(bar_index, p,
+bar_index+5, p, color=c,
+style=line.style_dashed)
+lb := label.new(bar_index+6, p, t+"
+"+str.tostring(p, format.mintick),color=color.white, textcolor=c,
+style=label.style_none, size=size.small)
+if barstate.islast
+f_lbl(bU,
+"RSI"
+, color.red)
+f_lbl(bL,
+"RSI"
+, color.green)
+grp = "Sinyal Zaman Dilimi Ayarları"
+tt = "Boş bırakılırsa mevcut grafiğin zaman
+dilimini kullanır."
+tf_al = input.timeframe(""
+,
+"Al Sinyali Zaman
+Dilimi"
+, group=grp, tooltip=tt)
+tf_sat = input.timeframe(""
+,
+"Sat Sinyali
+Zaman Dilimi"
+, group=grp, tooltip=tt)
+tf_fbb = input.timeframe(""
+,
+"FBB Sinyali
+Zaman Dilimi"
+, group=grp, tooltip=tt)
+f_sig() =>
+[st, d] = ta.supertrend(3.0, 21)
+float a = na
+ns = math.abs(close - close[21])
+nn = math.sum(math.abs(close -
+close[1]), 21)
+a := nz(a[1]) + math.pow((nn != 0 ? ns /
+nn : 0) * 0.6015 + 0.0645, 2) * (close -
+nz(a[1]))d > 0 and ta.crossunder(st, a) ? 1 : d < 0
+and ta.crossover(st, a) ? -1 : 0
+calc_sig() =>
+bot = ta.vwma(hlc3, 200) - (3.0 *
+ta.stdev(hlc3, 200))
+bs = math.abs(close - open) > (ta.atr(200)
+* 0.1)
+br = close < open
+bl = close < bot
+br and bl and bs and br[1] and bl[1] and
+bs[1]
+get_custom_tf_signal(string tf, string
+sigType) =>
+bool sig = false
+if tf == "" or timeframe.in_seconds(tf) ==
+timeframe.in_seconds(timeframe.period)
+sig := sigType == "AL" ? f_sig() == 1 :
+sigType == "SAT" ? f_sig() == -1 : calc_sig()
+else if timeframe.in_seconds(tf) >
+timeframe.in_seconds(timeframe.period)
+sig := request.security(syminfo.tickerid,
+tf, sigType == "AL" ? f_sig() == 1 : sigType
+== "SAT" ? f_sig() == -1 : calc_sig(),gaps=barmerge.gaps_of,
+lookahead=barmerge.lookahead_of)
+else
+arr =
+request.security_lower_tf(syminfo.tickerid,
+tf, sigType == "AL" ? f_sig() == 1 : sigType
+== "SAT" ? f_sig() == -1 : calc_sig())
+sig := array.size(arr) > 0 and
+array.includes(arr, true)
+sig
+al_sig = get_custom_tf_signal(tf_al,
+"AL")
+sat_sig = get_custom_tf_signal(tf_sat,
+"SAT")
+signal_exists = get_custom_tf_signal(tf_fbb,
+"FBB")
+plotshape(al_sig,
+"Al"
+, shape.triangleup,
+location.belowbar, color.green,
+size=size.tiny)
+plotshape(sat_sig,
+"Sat"
+,
+shape.triangledown, location.abovebar,
+color.red, size=size.tiny)plotshape(signal_exists,
+"AL_FBB"
+,
+shape.labelup, location.belowbar,
+color.orange, size=size.tiny)
+var string latest_sig_text = ""
+var color latest_sig_color = na
+var int day_tracker = dayofmonth(time,
+"Europe/Istanbul")
+if dayofmonth(time,
+"Europe/Istanbul") !=
+day_tracker
+latest_sig_text := ""
+latest_sig_color := na
+day_tracker := dayofmonth(time,
+"Europe/Istanbul")
+al_1h = get_custom_tf_signal("60"
+,
+"AL")
+sat_1h = get_custom_tf_signal("60"
+,
+"SAT")
+fbb_1h = get_custom_tf_signal("60"
+,
+"FBB")
+al_4h = get_custom_tf_signal("240"
+,
+"AL")
+sat_4h = get_custom_tf_signal("240"
+,
+"SAT")
+fbb_4h = get_custom_tf_signal("240"
+,
+"FBB")
+al_1d = get_custom_tf_signal("1D"
+,
+"AL")
+sat_1d = get_custom_tf_signal("1D"
+,
+"SAT")fbb_1d = get_custom_tf_signal("1D"
+,
+"FBB")
+new_sig = al_1d ? "1D: AL" : sat_1d ? "1D:
+SAT" : fbb_1d ? "1D: FBB" : al_4h ? "4h:
+AL" : sat_4h ? "4h: SAT" : fbb_4h ? "4h:
+FBB" : al_1h ? "1h: AL" : sat_1h ? "1h: SAT"
+: fbb_1h ? "1h: FBB" : ""
+new_col = al_1d ? color.green : sat_1d ?
+color.red : fbb_1d ? color.orange : al_4h ?
+color.green : sat_4h ? color.red : fbb_4h ?
+color.orange : al_1h ? color.green : sat_1h ?
+color.red : fbb_1h ? color.orange : na
+if new_sig != ""
+latest_sig_text := new_sig
+latest_sig_color := new_col
+alert(syminfo.ticker + "-> " +
+latest_sig_text, alert.freq_once_per_bar)
+var label sig_label = label.new(bar_index,
+close,
+""
+, style=label.style_label_left)
+[st_current, direction] = ta.supertrend(3.0,
+21)
+if barstate.islastlabel.set_xy(sig_label, latest_sig_text !=
+"" ? bar_index + 3 : bar_index,
+latest_sig_text != "" ? close : na)
+label.set_text(sig_label, latest_sig_text)
+label.set_color(sig_label,
+color.new(latest_sig_color, 80))
+label.set_textcolor(sig_label,
+latest_sig_color)
+f_lbl(st_current, direction < 0 ? "ST
+Destek" : "ST Direnç"
+, direction < 0 ?
+color.green : color.red)
+ST KAMA
+// This Pine Script® code is subject to the
+terms of the Mozilla Public License 2.0 at
+https:/mozilla.org/MPL/2.0/
+/@version=5
+indicator("KAMA (21) & SuperTrend (21)"
+,
+overlay=true)
+// --- Girdiler (Inputs) ---
+length = input.int(21, title="Ortak Periyot
+(KAMA & Supertrend)")
+stMultiplier = input.float(3.0,
+title="Supertrend Çarpanı (Multiplier)")// KAMA için standart hızlı ve yavaş EMA
+ayarları
+fastLength = input.int(2, title="KAMA Hızlı
+EMA")
+slowLength = input.int(30, title="KAMA
+Yavaş EMA")
+// --- KAMA (Kaufman Adaptive Moving
+Average) Hesaplaması ---
+volatility = math.sum(math.abs(close -
+close[1]), length)
+change = math.abs(close - close[length])
+er = volatility != 0 ? change / volatility : 0 //
+Eficiency Ratio (Verimlilik Oranı)
+fastAlpha = 2.0 / (fastLength + 1)
+slowAlpha = 2.0 / (slowLength + 1)
+sc = math.pow((er * (fastAlpha - slowAlpha))
++ slowAlpha, 2) // Smoothing Constant
 var float kama = na
-fast = input(2, title="Fast Period")
-slow = input(30, title="Slow Period")
-
-delta = math.abs(close - close[1])
-
-// calculate KAMA
-kama := na(kama[1]) ? close : kama[1] + (delta < 0 ? close - kama[1] : 0)
-
-// MTF StochRSI code
-stochRsiLength = input(14, title="Stoch RSI Length")
+kama := na(kama[1]) ? close : kama[1] + sc
+* (close - kama[1])
+// --- Supertrend Hesaplaması ---
+[supertrend, direction] =
+ta.supertrend(stMultiplier, length)// --- Çizimler (Plotting) ---
+// KAMA Çizimi
+plot(kama, title="KAMA"
+,
+color=color.new(color.blue, 0), linewidth=2)
+// Supertrend Çizimi (Yükseliş için yeşil,
+düşüş için kırmızı)
+upTrend = direction < 0 ? supertrend : na
+downTrend = direction > 0 ? supertrend : na
+plot(upTrend, title="Supertrend Yükseliş"
+,
+color=color.new(color.green, 0), linewidth=2,
+style=plot.style_linebr)
+plot(downTrend, title="Supertrend Düşüş"
+,
+color=color.new(color.red, 0), linewidth=2,
+style=plot.style_linebr)
+Mtf
+// This Pine Script® code is subject to the
+terms of the Mozilla Public License 2.0 at
+https:/mozilla.org/MPL/2.0/
+// © drzeynep3360
+/@version=5
+indicator("MTF StochRSI %K"
+,
+shorttitle="MTF Stoch %K"
+, overlay=false)
+// --- Girdiler (Inputs) ---rsiLength = input.int(14, title="RSI
+Uzunluğu")
+stochLength = input.int(14, title="Stoch
+Uzunluğu")
+smoothK = input.int(3, title="%K
+Yumuşatma")
+src = input(close, title="Kaynak")
+// --- StochRSI %K Hesaplama Fonksiyonu
+---
+calc_stoch_rsi(source, rsi_len, stoch_len,
+smooth_k) =>
+rsi_val = ta.rsi(source, rsi_len)
+// Sadece %K hesaplanıyor, %D'ye
+ihtiyacımız yok
+k_val = ta.sma(ta.stoch(rsi_val, rsi_val,
+rsi_val, stoch_len), smooth_k)
+k_val
+// --- Otomatik Üst Zaman Dilimi (HTF)
+Belirleme ---
+get_htf() =>
+string htf = "D" // Varsayılan değer
+if timeframe.period == "15"htf := "60" // 15 Dakika -> 1 Saat
+else if timeframe.period == "60"
+htf := "240" // 1 Saat -> 4 Saat
+else if timeframe.period == "240"
+htf := "D" // 4 Saat -> Günlük
+else if timeframe.period == "D" or
+timeframe.period == "1D"
+htf := "W" // Günlük -> Haftalık
+else
+// Eğer belirtilenler dışında bir zaman
+dilimindeyse
+// grafikteki zaman diliminin 4 katını alır
+(Örn: 5m -> 20m)
+htf := timeframe.period
+htf
+// Üst zaman dilimi değişkenini atayalım
+htf_res = get_htf()
+● // --- Değerlerin Hesaplanması ---
+// 1. Mevcut Zaman Diliminin %K Değeri
+current_k = calc_stoch_rsi(src, rsiLength,
+stochLength, smoothK)// 2. Üst Zaman Diliminin %K Değeri
+(Canlı/Anlık değere göre hesaplanır)
+// request.security fonksiyonu standart
+halinde o anki (kapanmamış) HTF
+mumunun canlı fiyatını baz alır.
+htf_k = request.security(syminfo.tickerid,
+htf_res, calc_stoch_rsi(src, rsiLength,
+stochLength, smoothK))
+// --- Çizimler (Plotting) ---
+// Mevcut zaman dilimini Mavi, üst zaman
+dilimini Kırmızı ile çizdiriyoruz.
+plot(current_k, color=color.blue,
+title="Mevcut Zaman %K"
+, linewidth=2)
+plot(htf_k, color=color.red, title="Üst Zaman
+%K (HTF)"
+, linewidth=2)
+// Aşırı alım / Aşırı satım referans çizgileri
+(Opsiyonel görselleştirme için)
+hline(80,
+"Aşırı Alım"
+, color=color.gray,
+linestyle=hline.style_dashed)
+hline(20,
+"Aşırı Satım"
+, color=color.gray,
+linestyle=hline.style_dashed)
+//@version=6
+indicator(title= 'Auto Fibs', overlay = true)//TimeFrame Selections
+Year_SR = timeframe.isdaily or timeframe.isintraday
+Month_SR = timeframe.period == '3' or timeframe.period == '5' or
+timeframe.period == '10' or timeframe.period == '15' or timeframe.period ==
+'26' or timeframe.period == '30' or timeframe.period == '60' or
+timeframe.period == '120'
+Week_SR = timeframe.period == '1' or timeframe.period == '3' or
+timeframe.period == '5' or timeframe.period == '10' or timeframe.period ==
+'15'
+//Colors
+yearColor = input(title = 'Year Line Color', defval = color.purple)
+monthColor = input(title = 'Month Line Color', defval = color.orange)
+weekColor = input(title = 'Resistance Line Color', defval = color.blue)
+// Giriş seçeneği: Kesikli mi yoksa Noktalı mı?
+styleOption = input.string(title = 'Çizgi Stili', options = ['Kesikli (╌)',
+'Noktalı (⋯)'], defval = 'Kesikli (╌)')
+// Stili belirle (Burada solid kodunu tamamen çıkardık)
+lineStyle = styleOption == 'Kesikli (╌)' ? line.style_dashed :
+line.style_dotted
+// Çizgiyi oluştur (width = 1 yaparak en ince hali sağlıyoruz)
+if barstate.islast
+line.new(x1 = bar_index[10], y1 = close, x2 = bar_index, y2 = close, style
+= lineStyle, width = 1)
+/////////////////////
+// PIVOT CALCULATIONS
+/////////////////////
+// Yearly
+[yphigh, yplow, ypclose] = request.security(syminfo.tickerid, '12M',
+[high[1], low[1], close[1]], lookahead = barmerge.lookahead_on)
+ypivot = (yphigh + yplow + ypclose) / 3
+yr7 = ypivot + (yphigh - yplow) * 2.000
+yr6 = ypivot + (yphigh - yplow) * 1.618
+yr5 = ypivot + (yphigh - yplow) * 1.414
+yr4 = ypivot + (yphigh - yplow) * 1.272
+yr3 = ypivot + (yphigh - yplow) * 1.000
+yrc = ypivot + (yphigh - yplow) * 0.764
+yr2 = ypivot + (yphigh - yplow) * 0.618
+yrb = ypivot + (yphigh - yplow) * 0.500yr1 = ypivot + (yphigh - yplow) * 0.382
+yra = ypivot + (yphigh - yplow) * 0.236
+ysa = ypivot - (yphigh - yplow) * 0.236
+ys1 = ypivot - (yphigh - yplow) * 0.382
+ysb = ypivot - (yphigh - yplow) * 0.500
+ys2 = ypivot - (yphigh - yplow) * 0.618
+ysc = ypivot - (yphigh - yplow) * 0.764
+ys3 = ypivot - (yphigh - yplow) * 1.000
+ys4 = ypivot - (yphigh - yplow) * 1.272
+ys5 = ypivot - (yphigh - yplow) * 1.414
+ys6 = ypivot - (yphigh - yplow) * 1.618
+ys7 = ypivot - (yphigh - yplow) * 2.000
+// Monthly
+[mphigh, mplow, mpclose] = request.security(syminfo.tickerid, 'M', [high[1],
+low[1], close[1]], lookahead = barmerge.lookahead_on)
+mpivot = (mphigh + mplow + mpclose) / 3
+mr7 = mpivot + (mphigh - mplow) * 2.000
+mr6 = mpivot + (mphigh - mplow) * 1.618
+mr5 = mpivot + (mphigh - mplow) * 1.414
+mr4 = mpivot + (mphigh - mplow) * 1.272
+mr3 = mpivot + (mphigh - mplow) * 1.000
+mrc = mpivot + (mphigh - mplow) * 0.764
+mr2 = mpivot + (mphigh - mplow) * 0.618
+mrb = mpivot + (mphigh - mplow) * 0.500
+mr1 = mpivot + (mphigh - mplow) * 0.382
+mra = mpivot + (mphigh - mplow) * 0.236
+msa = mpivot - (mphigh - mplow) * 0.236
+ms1 = mpivot - (mphigh - mplow) * 0.382
+msb = mpivot - (mphigh - mplow) * 0.500
+ms2 = mpivot - (mphigh - mplow) * 0.618
+msc = mpivot - (mphigh - mplow) * 0.764
+ms3 = mpivot - (mphigh - mplow) * 1.000
+ms4 = mpivot - (mphigh - mplow) * 1.272
+ms5 = mpivot - (mphigh - mplow) * 1.414
+ms6 = mpivot - (mphigh - mplow) * 1.618
+ms7 = mpivot - (mphigh - mplow) * 2.000
+// Weekly
+[wphigh, wplow, wpclose] = request.security(syminfo.tickerid, 'W', [high[1],
+low[1], close[1]], lookahead = barmerge.lookahead_on)
+wpivot = (wphigh + wplow + wpclose) / 3
+wr7 = wpivot + (wphigh - wplow) * 2.000
+wr6 = wpivot + (wphigh - wplow) * 1.618
+wr5 = wpivot + (wphigh - wplow) * 1.414wr4 = wpivot + (wphigh - wplow) * 1.272
+wr3 = wpivot + (wphigh - wplow) * 1.000
+wrc = wpivot + (wphigh - wplow) * 0.764
+wr2 = wpivot + (wphigh - wplow) * 0.618
+wrb = wpivot + (wphigh - wplow) * 0.500
+wr1 = wpivot + (wphigh - wplow) * 0.382
+wra = wpivot + (wphigh - wplow) * 0.236
+wsa = wpivot - (wphigh - wplow) * 0.236
+ws1 = wpivot - (wphigh - wplow) * 0.382
+wsb = wpivot - (wphigh - wplow) * 0.500
+ws2 = wpivot - (wphigh - wplow) * 0.618
+wsc = wpivot - (wphigh - wplow) * 0.764
+ws3 = wpivot - (wphigh - wplow) * 1.000
+ws4 = wpivot - (wphigh - wplow) * 1.272
+ws5 = wpivot - (wphigh - wplow) * 1.414
+ws6 = wpivot - (wphigh - wplow) * 1.618
+ws7 = wpivot - (wphigh - wplow) * 2.000
+closex = request.security(syminfo.tickerid, timeframe.period, close[1], gaps
+= barmerge.gaps_off, lookahead = barmerge.lookahead_on)
+/////////////////////
+// WEEK CONFIGURATION
+/////////////////////
+wcloseHigh10 = closex > wr6 and closex < wr7
+wcloseHigh9 = closex > wr5 and closex < wr6
+wcloseHigh8 = closex > wr4 and closex < wr5
+wcloseHigh7 = closex > wr3 and closex < wr4
+wcloseHigh6 = closex > wrc and closex < wr3
+wcloseHigh5 = closex > wr2 and closex < wrc
+wcloseHigh4 = closex > wrb and closex < wr2
+wcloseHigh3 = closex > wr1 and closex < wrb
+wcloseHigh2 = closex > wra and closex < wr1
+wcloseHigh1 = closex > wpivot and closex < wra
+wcloseLow1 = closex > wsa and closex < wpivot
+wcloseLow2 = closex > ws1 and closex < wsa
+wcloseLow3 = closex > wsb and closex < ws1
+wcloseLow4 = closex > ws2 and closex < wsb
+wcloseLow5 = closex > wsc and closex < ws2
+wcloseLow6 = closex > ws3 and closex < wsc
+wcloseLow7 = closex > ws4 and closex < ws3
+wcloseLow8 = closex > ws5 and closex < ws4
+wcloseLow9 = closex > ws6 and closex < ws5
+wcloseLow10 = closex > ws7 and closex < ws6var float weekResistanceLevel = na
+weekResistanceLevel := wcloseHigh10 ? wr7 : wcloseHigh9 ? wr6 : wcloseHigh8 ?
+wr5 : wcloseHigh7 ? wr4 : wcloseHigh6 ? wr3 : wcloseHigh5 ? wrc : wcloseHigh4
+? wr2 : wcloseHigh3 ? wrb : wcloseHigh2 ? wr1 : wcloseHigh1 ? wra :
+wcloseLow1 ? wpivot : wcloseLow2 ? wsa : wcloseLow3 ? ws1 : wcloseLow4 ? wsb
+: wcloseLow5 ? ws2 : wcloseLow6 ? wsc : wcloseLow7 ? ws3 : wcloseLow8 ? ws4 :
+wcloseLow9 ? ws5 : wcloseLow10 ? ws6 : weekResistanceLevel
+var float weekSupportLevel = na
+weekSupportLevel := wcloseHigh10 ? wr6 : wcloseHigh9 ? wr5 : wcloseHigh8 ?
+wr4 : wcloseHigh7 ? wr3 : wcloseHigh6 ? wrc : wcloseHigh5 ? wr2 : wcloseHigh4
+? wrb : wcloseHigh3 ? wr1 : wcloseHigh2 ? wra : wcloseHigh1 ? wpivot :
+wcloseLow1 ? wsa : wcloseLow2 ? ws1 : wcloseLow3 ? wsb : wcloseLow4 ? ws2 :
+wcloseLow5 ? wsc : wcloseLow6 ? ws3 : wcloseLow7 ? ws4 : wcloseLow8 ? ws5 :
+wcloseLow9 ? ws6 : wcloseLow10 ? ws7 : weekSupportLevel
+var string weekResistanceLabel = na
+weekResistanceLabel := wcloseHigh10 ? 'W R 2.000' : wcloseHigh9 ? 'W R 1.618'
+: wcloseHigh8 ? 'W R 1.414' : wcloseHigh7 ? 'W R 1.272' : wcloseHigh6 ? 'W R
+1.000' : wcloseHigh5 ? 'W R 0.764' : wcloseHigh4 ? 'W R 0.618' : wcloseHigh3
+? 'W R 0.500' : wcloseHigh2 ? 'W R 0.382' : wcloseHigh1 ? 'W R 0.236' :
+wcloseLow1 ? 'W Pivot' : wcloseLow2 ? 'W S 0.236' : wcloseLow3 ? 'W S 0.382'
+: wcloseLow4 ? 'W S 0.500' : wcloseLow5 ? 'W S 0.618' : wcloseLow6 ? 'W S
+0.764' : wcloseLow7 ? 'W S 1.000' : wcloseLow8 ? 'W S 1.272' : wcloseLow9 ?
+'W S 1.414' : wcloseLow10 ? 'W S 1.618' : weekResistanceLabel
+var string weekSupportLabel = na
+weekSupportLabel := wcloseHigh10 ? 'W R 1.618' : wcloseHigh9 ? 'W R 1.414' :
+wcloseHigh8 ? 'W R 1.272' : wcloseHigh7 ? 'W R 1.000' : wcloseHigh6 ? 'W R
+0.764' : wcloseHigh5 ? 'W R 0.618' : wcloseHigh4 ? 'W R 0.500' : wcloseHigh3
+? 'W R 0.382' : wcloseHigh2 ? 'W R 0.236' : wcloseHigh1 ? 'W Pivot' :
+wcloseLow1 ? 'W S 0.236' : wcloseLow2 ? 'W S 0.382' : wcloseLow3 ? 'W S
+0.500' : wcloseLow4 ? 'W S 0.618' : wcloseLow5 ? 'W S 0.764' : wcloseLow6 ?
+'W S 1.000' : wcloseLow7 ? 'W S 1.272' : wcloseLow8 ? 'W S 1.414' :
+wcloseLow9 ? 'W S 1.618' : wcloseLow10 ? 'W S 2.000' : weekSupportLabel
+/////////////////////
+// MONTH CONFIGURATION
+/////////////////////
+mcloseHigh1 = closex > mpivot and closex < mra
+mcloseHigh2 = closex > mra and closex < mr1
+mcloseHigh3 = closex > mr1 and closex < mrb
+mcloseHigh4 = closex > mrb and closex < mr2
+mcloseHigh5 = closex > mr2 and closex < mrc
+mcloseHigh6 = closex > mrc and closex < mr3mcloseHigh7 = closex > mr3 and closex < mr4
+mcloseHigh8 = closex > mr4 and closex < mr5
+mcloseHigh9 = closex > mr5 and closex < mr6
+mcloseHigh10 = closex > mr6 and closex < mr7
+mcloseLow1 = closex > msa and closex < mpivot
+mcloseLow2 = closex > ms1 and closex < msa
+mcloseLow3 = closex > msb and closex < ms1
+mcloseLow4 = closex > ms2 and closex < msb
+mcloseLow5 = closex > msc and closex < ms2
+mcloseLow6 = closex > ms3 and closex < msc
+mcloseLow7 = closex > ms4 and closex < ms3
+mcloseLow8 = closex > ms5 and closex < ms4
+mcloseLow9 = closex > ms6 and closex < ms5
+mcloseLow10 = closex > ms7 and closex < ms6
+var float monthResistanceLevel = na
+monthResistanceLevel := mcloseHigh10 ? mr7 : mcloseHigh9 ? mr6 : mcloseHigh8
+? mr5 : mcloseHigh7 ? mr4 : mcloseHigh6 ? mr3 : mcloseHigh5 ? mrc :
+mcloseHigh4 ? mr2 : mcloseHigh3 ? mrb : mcloseHigh2 ? mr1 : mcloseHigh1 ? mra
+: mcloseLow1 ? mpivot : mcloseLow2 ? msa : mcloseLow3 ? ms1 : mcloseLow4 ?
+msb : mcloseLow5 ? ms2 : mcloseLow6 ? msc : mcloseLow7 ? ms3 : mcloseLow8 ?
+ms4 : mcloseLow9 ? ms5 : mcloseLow10 ? ms6 : monthResistanceLevel
+var float monthSupportLevel = na
+monthSupportLevel := mcloseHigh10 ? mr6 : mcloseHigh9 ? mr5 : mcloseHigh8 ?
+mr4 : mcloseHigh7 ? mr3 : mcloseHigh6 ? mrc : mcloseHigh5 ? mr2 : mcloseHigh4
+? mrb : mcloseHigh3 ? mr1 : mcloseHigh2 ? mra : mcloseHigh1 ? mpivot :
+mcloseLow1 ? msa : mcloseLow2 ? ms1 : mcloseLow3 ? msb : mcloseLow4 ? ms2 :
+mcloseLow5 ? msc : mcloseLow6 ? ms3 : mcloseLow7 ? ms4 : mcloseLow8 ? ms5 :
+mcloseLow9 ? ms6 : mcloseLow10 ? ms7 : monthSupportLevel
+var string monthResistanceLabel = na
+monthResistanceLabel := mcloseHigh10 ? 'M R 2.000' : mcloseHigh9 ? 'M R
+1.618' : mcloseHigh8 ? 'M R 1.414' : mcloseHigh7 ? 'M R 1.272' : mcloseHigh6
+? 'M R 1.000' : mcloseHigh5 ? 'M R 0.764' : mcloseHigh4 ? 'M R 0.618' :
+mcloseHigh3 ? 'M R 0.500' : mcloseHigh2 ? 'M R 0.382' : mcloseHigh1 ? 'M R
+0.236' : mcloseLow1 ? 'M Pivot' : mcloseLow2 ? 'M S 0.236' : mcloseLow3 ? 'M
+S 0.382' : mcloseLow4 ? 'M S 0.500' : mcloseLow5 ? 'M S 0.618' : mcloseLow6 ?
+'M S 0.764' : mcloseLow7 ? 'M S 1.000' : mcloseLow8 ? 'M S 1.272' :
+mcloseLow9 ? 'M S 1.414' : mcloseLow10 ? 'M S 1.618' : monthResistanceLabel
+var string monthSupportLabel = na
+monthSupportLabel := mcloseHigh10 ? 'M R 1.618' : mcloseHigh9 ? 'M R 1.414' :
+mcloseHigh8 ? 'M R 1.272' : mcloseHigh7 ? 'M R 1.000' : mcloseHigh6 ? 'M R0.764' : mcloseHigh5 ? 'M R 0.618' : mcloseHigh4 ? 'M R 0.500' : mcloseHigh3
+? 'M R 0.382' : mcloseHigh2 ? 'M R 0.236' : mcloseHigh1 ? 'M Pivot' :
+mcloseLow1 ? 'M S 0.236' : mcloseLow2 ? 'M S 0.382' : mcloseLow3 ? 'M S
+0.500' : mcloseLow4 ? 'M S 0.618' : mcloseLow5 ? 'M S 0.764' : mcloseLow6 ?
+'M S 1.000' : mcloseLow7 ? 'M S 1.272' : mcloseLow8 ? 'M S 1.414' :
+mcloseLow9 ? 'M S 1.618' : mcloseLow10 ? 'M S 2.000' : monthSupportLabel
+/////////////////////
+// YEAR CONFIGURATION
+/////////////////////
+ycloseHigh1 = closex > ypivot and closex < yra
+ycloseHigh2 = closex > yra and closex < yr1
+ycloseHigh3 = closex > yr1 and closex < yrb
+ycloseHigh4 = closex > yrb and closex < yr2
+ycloseHigh5 = closex > yr2 and closex < yrc
+ycloseHigh6 = closex > yrc and closex < yr3
+ycloseHigh7 = closex > yr3 and closex < yr4
+ycloseHigh8 = closex > yr4 and closex < yr5
+ycloseHigh9 = closex > yr5 and closex < yr6
+ycloseHigh10 = closex > yr6 and closex < yr7
+ycloseLow1 = closex > ysa and closex < ypivot
+ycloseLow2 = closex > ys1 and closex < ysa
+ycloseLow3 = closex > ysb and closex < ys1
+ycloseLow4 = closex > ys2 and closex < ysb
+ycloseLow5 = closex > ysc and closex < ys2
+ycloseLow6 = closex > ys3 and closex < ysc
+ycloseLow7 = closex > ys4 and closex < ys3
+ycloseLow8 = closex > ys5 and closex < ys4
+ycloseLow9 = closex > ys6 and closex < ys5
+ycloseLow10 = closex > ys7 and closex < ys6
+var float yearResistanceLevel = na
+yearResistanceLevel := ycloseHigh10 ? yr7 : ycloseHigh9 ? yr6 : ycloseHigh8 ?
+yr5 : ycloseHigh7 ? yr4 : ycloseHigh6 ? yr3 : ycloseHigh5 ? yrc : ycloseHigh4
+? yr2 : ycloseHigh3 ? yrb : ycloseHigh2 ? yr1 : ycloseHigh1 ? yra :
+ycloseLow1 ? ypivot : ycloseLow2 ? ysa : ycloseLow3 ? ys1 : ycloseLow4 ? ysb
+: ycloseLow5 ? ys2 : ycloseLow6 ? ysc : ycloseLow7 ? ys3 : ycloseLow8 ? ys4 :
+ycloseLow9 ? ys5 : ycloseLow10 ? ys6 : yearResistanceLevel
+var float yearSupportLevel = na
+yearSupportLevel := ycloseHigh10 ? yr6 : ycloseHigh9 ? yr5 : ycloseHigh8 ?
+yr4 : ycloseHigh7 ? yr3 : ycloseHigh6 ? yrc : ycloseHigh5 ? yr2 : ycloseHigh4
+? yrb : ycloseHigh3 ? yr1 : ycloseHigh2 ? yra : ycloseHigh1 ? ypivot :
+ycloseLow1 ? ysa : ycloseLow2 ? ys1 : ycloseLow3 ? ysb : ycloseLow4 ? ys2 :ycloseLow5 ? ysc : ycloseLow6 ? ys3 : ycloseLow7 ? ys4 : ycloseLow8 ? ys5 :
+ycloseLow9 ? ys6 : ycloseLow10 ? ys7 : yearSupportLevel
+var string yearResistanceLabel = na
+yearResistanceLabel := ycloseHigh10 ? 'Y R 2.000' : ycloseHigh9 ? 'Y R 1.618'
+: ycloseHigh8 ? 'Y R 1.414' : ycloseHigh7 ? 'Y R 1.272' : ycloseHigh6 ? 'Y R
+1.000' : ycloseHigh5 ? 'Y R 0.764' : ycloseHigh4 ? 'Y R 0.618' : ycloseHigh3
+? 'Y R 0.500' : ycloseHigh2 ? 'Y R 0.382' : ycloseHigh1 ? 'Y R 0.236' :
+ycloseLow1 ? 'Y Pivot' : ycloseLow2 ? 'Y S 0.236' : ycloseLow3 ? 'Y S 0.382'
+: ycloseLow4 ? 'Y S 0.500' : ycloseLow5 ? 'Y S 0.618' : ycloseLow6 ? 'Y S
+0.764' : ycloseLow7 ? 'Y S 1.000' : ycloseLow8 ? 'Y S 1.272' : ycloseLow9 ?
+'Y S 1.414' : ycloseLow10 ? 'Y S 1.618' : yearResistanceLabel
+var string yearSupportLabel = na
+yearSupportLabel := ycloseHigh10 ? 'Y R 1.618' : ycloseHigh9 ? 'Y R 1.414' :
+ycloseHigh8 ? 'Y R 1.272' : ycloseHigh7 ? 'Y R 1.000' : ycloseHigh6 ? 'Y R
+0.764' : ycloseHigh5 ? 'Y R 0.618' : ycloseHigh4 ? 'Y R 0.500' : ycloseHigh3
+? 'Y R 0.382' : ycloseHigh2 ? 'Y R 0.236' : ycloseHigh1 ? 'Y Pivot' :
+ycloseLow1 ? 'Y S 0.236' : ycloseLow2 ? 'Y S 0.382' : ycloseLow3 ? 'Y S
+0.500' : ycloseLow4 ? 'Y S 0.618' : ycloseLow5 ? 'Y S 0.764' : ycloseLow6 ?
+'Y S 1.000' : ycloseLow7 ? 'Y S 1.272' : ycloseLow8 ? 'Y S 1.414' :
+ycloseLow9 ? 'Y S 1.618' : ycloseLow10 ? 'Y S 2.000' : yearSupportLabel
+/////////////////////
+// DRAWING LOGIC (FIB ETİKETLERİ & ÇİZGİLERİ)
+/////////////////////
+// Fiyat ölçeğindeki gereksiz değerleri gizliyoruz (display=display.none)
+plot(Week_SR ? weekResistanceLevel : na, title='Week Res', color=weekColor,
+display=display.none)
+plot(Week_SR ? weekSupportLevel : na, title='Week Supp', color=weekColor,
+display=display.none)
+plot(Month_SR ? monthResistanceLevel : na, title='Month Res',
+color=monthColor, display=display.none)
+plot(Month_SR ? monthSupportLevel : na, title='Month Supp', color=monthColor,
+display=display.none)
+plot(Year_SR ? yearResistanceLevel : na, title='Year Res', color=yearColor,
+display=display.none)
+plot(Year_SR ? yearSupportLevel : na, title='Year Supp', color=yearColor,
+display=display.none)
+// Sadece son barda kısa çizgi ve etiket çizen ana fonksiyon
+f_draw_fib(bool show_cond, float price_level, string label_text, color
+line_color) =>var line ln = na
+var label lbl = na
+if barstate.islast and show_cond and not na(price_level)
+line.delete(ln)
+label.delete(lbl)
+// Çizgiyi mevcut bardan 5 bar ileriye çiziyoruz (Sonsuza uzamaz)
+ln := line.new(bar_index, price_level, bar_index + 5, price_level,
+color=line_color, style=lineStyle, width=2)
+// Etiketi çizginin sonuna ekliyoruz
+lbl := label.new(bar_index + 6, price_level, label_text + " " +
+str.tostring(price_level, format.mintick), color=color.white,
+textcolor=line_color, style=label.style_none, size=size.small)
+// Son bardaysa ilgili zaman dilimlerinin Destek/Dirençlerini ekrana bas
+if barstate.islast
+f_draw_fib(Week_SR, weekResistanceLevel, weekResistanceLabel, weekColor)
+f_draw_fib(Week_SR, weekSupportLevel, weekSupportLabel, weekColor)
+f_draw_fib(Month_SR, monthResistanceLevel, monthResistanceLabel,
+monthColor)
+f_draw_fib(Month_SR, monthSupportLevel, monthSupportLabel, monthColor)
+f_draw_fib(Year_SR, yearResistanceLevel, yearResistanceLabel, yearColor)
+f_draw_fib(Year_SR, yearSupportLevel, yearSupportLabel, yearColor)
+// --- Hesaplamalar (RSI Bandı kısmı eskisi gibi kalıyor) ---
+auc = ta.ema(math.max(close - close[1], 0), 27)
+adc = ta.ema(math.max(close[1] - close, 0), 27)
+// Üst Bant (Overbought)
+x1 = (14 - 1) * (adc * 70 / (100 - 70) - auc)
+ub = x1 >= 0 ? close + x1 : close + x1 * (100 - 70) / 70
+// Alt Bant (Oversold)
+x2 = (14 - 1) * (adc * 30 / (100 - 30) - auc)
+lb = x2 >= 0 ? close + x2 : close + x2 * (100 - 30) / 30
+// Orta Hat
+midLine = math.avg(ub, lb)
+// --- Görselleştirme (RSI) ---
+// display = display.none ekleyerek sağdaki fiyat etiketlerini kaldırdık
+plot(ub, title="Resistance (OB)", color=color.red, linewidth=2, display =
+display.none)plot(lb, title="Support (OS)", color=color.green, linewidth=2, display =
+display.none)
+// Arka plan boyaması için plot referanslarını kullanmaya devam ediyoruz
+p_ub = plot(ub, display = display.none)
+p_lb = plot(lb, display = display.none)
+fill(p_ub, p_lb, color=color.new(color.gray, 90), title="Background")
+//@version=6
+indicator("Aydın", overlay=true)
+// ==========================================
+// --- VSA HACİM MUM BOYAMA EKLENTİSİ ---
+// ==========================================
+volMA = ta.rma(volume, 20)
+ultraHighVolumeMin = volMA * 2.2
+volUltraHigh = volume >= ultraHighVolumeMin
+barcolor(volUltraHigh ? color.purple : na)
+// ==========================================
+// --- ORİJİNAL AYDIN İNDİKATÖRÜ ---
+// ==========================================
+ep = 2 * 14 - 1
+auc = ta.ema(math.max(close - close[1], 0), ep)
+adc = ta.ema(math.max(close[1] - close, 0), ep)
+x1 = 13 * (adc * 70 / 30 - auc)
+bU = x1 >= 0 ? close + x1 : close + x1 * 30 / 70
+x2 = 13 * (adc * 30 / 70 - auc)
+bL = x2 >= 0 ? close + x2 : close + x2 * 70 / 30
+f_lbl(float p, string t, color c) =>
+var line l = na
+var label lb = na
+if barstate.islast and not na(p)
+line.delete(l), label.delete(lb)
+l := line.new(bar_index, p, bar_index+5, p, color=c,
+style=line.style_dashed)
+lb := label.new(bar_index+6, p, t+" "+str.tostring(p, format.mintick),
+color=color.white, textcolor=c, style=label.style_none, size=size.small)
+if barstate.islast
+f_lbl(bU, "RSI Üst", color.red)
+f_lbl(bL, "RSI Alt", color.green)// ==========================================
+// 2. AL / SAT SİNYALİ MANTIĞI VE ZAMAN DİLİMLERİ
+// ==========================================
+grp_tf = "Sinyal Zaman Dilimi Ayarları"
+tf_al = input.timeframe("", title="Al Sinyali Zaman Dilimi", group=grp_tf,
+tooltip="Boş bırakılırsa mevcut grafiğin zaman dilimini kullanır.")
+tf_sat = input.timeframe("", title="Sat Sinyali Zaman Dilimi", group=grp_tf,
+tooltip="Boş bırakılırsa mevcut grafiğin zaman dilimini kullanır.")
+tf_fbb = input.timeframe("", title="FBB Sinyali Zaman Dilimi", group=grp_tf,
+tooltip="Boş bırakılırsa mevcut grafiğin zaman dilimini kullanır.")
+// Temel Sinyal Fonksiyonları
+f_sig() =>
+[st, d] = ta.supertrend(3.0, 21)
+float a = na
+ns = math.abs(close - close[21])
+nn = math.sum(math.abs(close - close[1]), 21)
+a := nz(a[1]) + math.pow((nn != 0 ? ns / nn : 0) * 0.6015 + 0.0645, 2) *
+(close - nz(a[1]))
+d > 0 and ta.crossunder(st, a) ? 1 : d < 0 and ta.crossover(st, a) ? -1 :
+0
+calc_sig() =>
+bot = ta.vwma(hlc3, 200) - (3.0 * ta.stdev(hlc3, 200))
+bs = math.abs(close - open) > (ta.atr(200) * 0.1)
+br = close < open
+bl = close < bot
+(br and bl and bs) and (br[1] and bl[1] and bs[1])
+get_custom_tf_signal(string tf, string sigType) =>
+bool sig = false
+// 1. Durum: Zaman dilimi grafikle aynıysa veya boş bırakıldıysa
+if tf == "" or timeframe.in_seconds(tf) ==
+timeframe.in_seconds(timeframe.period)
+if sigType == "AL"
+sig := f_sig() == 1
+else if sigType == "SAT"
+sig := f_sig() == -1
+else if sigType == "FBB"
+sig := calc_sig()
+// 2. Durum: Seçilen zaman dilimi grafikten BÜYÜKSE (Üst Zaman Dilimi)
+else if timeframe.in_seconds(tf) > timeframe.in_seconds(timeframe.period)if sigType == "AL"
+sig := request.security(syminfo.tickerid, tf, f_sig() == 1,
+gaps=barmerge.gaps_off, lookahead=barmerge.lookahead_off)
+else if sigType == "SAT"
+sig := request.security(syminfo.tickerid, tf, f_sig() == -1,
+gaps=barmerge.gaps_off, lookahead=barmerge.lookahead_off)
+else if sigType == "FBB"
+sig := request.security(syminfo.tickerid, tf, calc_sig(),
+gaps=barmerge.gaps_off, lookahead=barmerge.lookahead_off)
+else
+if sigType == "AL"
+arr = request.security_lower_tf(syminfo.tickerid, tf, f_sig() ==
+1)
+sig := array.size(arr) > 0 and array.includes(arr, true)
+else if sigType == "SAT"
+arr = request.security_lower_tf(syminfo.tickerid, tf, f_sig() ==
+-1)
+sig := array.size(arr) > 0 and array.includes(arr, true)
+else if sigType == "FBB"
+arr = request.security_lower_tf(syminfo.tickerid, tf, calc_sig())
+sig := array.size(arr) > 0 and array.includes(arr, true)
+sig // Sonucu döndür
+al_sig = get_custom_tf_signal(tf_al, "AL")
+sat_sig = get_custom_tf_signal(tf_sat, "SAT")
+signal_exists = get_custom_tf_signal(tf_fbb, "FBB")
+// Şekilleri Çizdirme
+plotshape(al_sig, "Al", shape.triangleup, location.belowbar, color.green,
+size=size.tiny)
+plotshape(sat_sig, "Sat", shape.triangledown, location.abovebar, color.red,
+size=size.tiny)
+plotshape(signal_exists, "AL_FBB", shape.labelup, location.belowbar,
+color.orange, size=size.tiny)
+// ==========================================
+// 3. ÇOKLU ZAMAN DİLİMİ ETİKETİ VE DİNAMİK ALARM
+// ==========================================
+var string latest_sig_text = ""
+var color latest_sig_color = na
+bool label_updated = false
+// Gün değişimi kontrolü (UTC+3 İstanbul saatine göre)var int day_tracker = dayofmonth(time, "Europe/Istanbul")
+if dayofmonth(time, "Europe/Istanbul") != day_tracker
+latest_sig_text := "" // Yeni güne geçildiğinde etiketi temizle
+latest_sig_color := na
+day_tracker := dayofmonth(time, "Europe/Istanbul")
+// Hedef Zaman Dilimlerindeki Sinyalleri Çek (1 Saat = "60", 4 Saat = "240",
+Günlük = "1D")
+al_1h = get_custom_tf_signal("60", "AL")
+sat_1h = get_custom_tf_signal("60", "SAT")
+fbb_1h = get_custom_tf_signal("60", "FBB")
+al_4h = get_custom_tf_signal("240", "AL")
+sat_4h = get_custom_tf_signal("240", "SAT")
+fbb_4h = get_custom_tf_signal("240", "FBB")
+al_1d = get_custom_tf_signal("1D", "AL")
+sat_1d = get_custom_tf_signal("1D", "SAT")
+fbb_1d = get_custom_tf_signal("1D", "FBB")
+string new_sig = ""
+color new_col = na
+// Günlük Sinyaller
+if al_1d
+new_sig := "1D: AL", new_col := color.green
+else if sat_1d
+new_sig := "1D: SAT", new_col := color.red
+else if fbb_1d
+new_sig := "1D: FBB", new_col := color.orange
+// 4 Saatlik Sinyaller
+if al_4h
+new_sig := "4h: AL", new_col := color.green
+else if sat_4h
+new_sig := "4h: SAT", new_col := color.red
+else if fbb_4h
+new_sig := "4h: FBB", new_col := color.orange
+// 1 Saatlik Sinyaller
+if al_1h
+new_sig := "1h: AL", new_col := color.green
+else if sat_1h
+new_sig := "1h: SAT", new_col := color.red
+else if fbb_1hnew_sig := "1h: FBB", new_col := color.orange
+// Yeni bir sinyal varsa hafızayı (var değişkenlerini) güncelle
+if new_sig != ""
+latest_sig_text := new_sig
+latest_sig_color := new_col
+label_updated := true
+// Yeni sinyal oluştuğunda dinamik alarmı tetikle
+if label_updated
+alert("" + syminfo.ticker + "-> " + latest_sig_text,
+alert.freq_once_per_bar)
+// Etiketi Çizdirme (Sadece son barda)
+var label sig_label = label.new(x=bar_index, y=close, text="",
+style=label.style_label_left)
+if barstate.islast
+if latest_sig_text != ""
+// Etiketi görünür kıl ve yerini güncelle
+label.set_xy(sig_label, bar_index + 3, close)
+label.set_text(sig_label, "" + latest_sig_text)
+label.set_color(sig_label, color.new(latest_sig_color, 80)) // Arka
+plan hafif şeffaf
+label.set_textcolor(sig_label, latest_sig_color)
+else
+// Gün sıfırlanmışsa ve henüz sinyal yoksa etiketi ekrandan gizle
+label.set_xy(sig_label, bar_index, na)//@version=6
+indicator(title = 'RSI', shorttitle = 'RSI', overlay = false)
+// =========================================================================
+// --- 1. KISIM: KAMA & SUPERTREND (ANA FİYAT GRAFİĞİNE ÇİZİLİR) ---
+// =========================================================================
+showInd = input.bool(true, 'KAMA_ST Göster/Gizle', group = 'KAMA & Supertrend
+Ayarları')
+// KAMA Hesaplama
+diff = math.abs(close - close[1])
+ER = math.sum(diff, 21) != 0 ? math.abs(close - close[21]) / math.sum(diff,
+21) : 0
+sc = math.pow(ER * (0.666 - 0.0645) + 0.0645, 2)
+float kama = 0.0
+kama := nz(kama[1], close) + sc * (close - nz(kama[1], close))
+// Supertrend
+[st, dir] = ta.supertrend(3.0, 21)
+// --- Çizimler (force_overlay=true ile mumların üzerine basılır) ---
+plot(showInd ? kama : na, 'KAMA', color = color.blue, linewidth = 2,
+force_overlay = true)
+// Supertrend çizgisi
+stPlot = plot(showInd ? st : na, 'ST', dir < 0 ? color.green : color.red,
+linewidth = 2, style = plot.style_linebr, force_overlay = true)
+// Fill (Doldurma) işlemi için orta bant (gizli)
+midPlot = plot(showInd ? (open + close) / 2 : na, display = display.none,
+force_overlay = true)
+// Supertrend ve Fiyat Ortası Doldurma
+fill(midPlot, stPlot, color = dir < 0 ? color.new(color.green, 90) :
+color.new(color.red, 90))
+// =========================================================================
+// --- 2. KISIM: RSI (ALT PANELE ÇİZİLİR) ---
+// =========================================================================
 src = close
-rsiValue = ta.rsi(src, stochRsiLength)
-stochRsi = (rsiValue - ta.lowest(rsiValue, stochRsiLength)) / (ta.highest(rsiValue, stochRsiLength) - ta.lowest(rsiValue, stochRsiLength))
-
-// Auto Fibs Pivot code
-fibLevel1 = input(0.236, "Fib Level 1")
-fibLevel2 = input(0.618, "Fib Level 2")
-// Pivot calculation
-pivotHigh = highest(high, 14)
-pivotLow = lowest(low, 14)
-
-// Aydin Indicator Placeholder
-plot(kama, title="KAMA", color=color.blue)
-
-plot(stochRsi, title="Stoch RSI", color=color.red)
-
-// Additional plotting for Fibonacci Levels
-hline(pivotHigh * fibLevel1, "Fib Level 1", color=color.green)
-hline(pivotLow * fibLevel2, "Fib Level 2", color=color.orange)
-
+len = input.int(14, minval = 1, title = 'RSI Length', group = 'RSI Ayarları')
+up = ta.rma(math.max(ta.change(src), 0), len)
+down = ta.rma(-math.min(ta.change(src), 0), len)
+rsi_val = down == 0 ? 100 : up == 0 ? 0 : 100 - 100 / (1 + up / down)plot(rsi_val, color = color.fuchsia, linewidth = 2, title = 'RSI')
+band1 = hline(70, color = color.gray, linestyle = hline.style_dotted)
+band0 = hline(30, color = color.gray, linestyle = hline.style_dotted)
+fill(band1, band0, color = color.new(color.purple, 95))
+// =========================================================================
+// --- 3. KISIM: STOCHASTIC RSI (ALT PANELE ÇİZİLİR) ---
+// =========================================================================
+smoothK = input.int(3, minval = 1, title = 'K Smoothing', group = 'StochRSI
+Ayarları')
+smoothD = input.int(3, minval = 1, title = 'D Smoothing', group = 'StochRSI
+Ayarları')
+lengthRSI = input.int(14, minval = 1, title = 'StochRSI Length', group =
+'StochRSI Ayarları')
+lengthStoch = input.int(14, minval = 1, title = 'Stoch Length', group =
+'StochRSI Ayarları')
+srcsrsi = input.source(close, title = 'RSI Source', group = 'StochRSI
+Ayarları')
+rsi1 = ta.rsi(srcsrsi, lengthRSI)
+k = ta.sma(ta.stoch(rsi1, rsi1, rsi1, lengthStoch), smoothK)
+d = ta.sma(k, smoothD)
+plot(k, color = color.blue, title = '%K')
+plot(d, color = color.orange, title = '%D')
+h0 = hline(80, color = color.gray, linestyle = hline.style_dotted)
+h1 = hline(20, color = color.gray, linestyle = hline.style_dotted)
+fill(h0, h1, color = color.new(color.purple, 95))
+// =========================================================================
+// --- 4. KISIM: İŞARETLEYİCİLER (MARKERS) ---
+// =========================================================================
+// %K'nın 0 olduğu yerler (Aşırı Satım Dibinin Dibi)
+plotshape(k <= 0, title = 'Dip Seviye (0)', style = shape.diamond, location =
+location.bottom, color = color.blue, size = size.tiny)
+// %K'nın 99 veya 100 olduğu yerler (Aşırı Alım Tepesi)
+plotshape(k >= 99, title = 'Tepe Seviye (99-100)', style = shape.diamond,
+location = location.top, color = color.orange, size = size.tiny)
