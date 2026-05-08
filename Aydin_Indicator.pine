@@ -19,10 +19,12 @@ kama := nz(kama[1], close) + sc * (close - nz(kama[1], close))
 // --- Çizimler (force_overlay=true ile mumların üzerine basılır) ---
 plot(showInd ? kama : na, 'KAMA', color = color.blue, linewidth = 2, force_overlay = true)
 
-// Supertrend çizgisi
-stPlot = plot(showInd ? st : na, 'ST', dir < 0 ? color.green : color.red, linewidth = 2, style = plot.style_linebr, force_overlay = true)
+// Supertrend Çizgileri (Geçişlerde bağlantı olmaması için yönlere göre ayrıldı)
+plot(showInd and dir < 0 ? st : na, 'ST Yükseliş', color = color.green, linewidth = 2, style = plot.style_linebr, force_overlay = true)
+plot(showInd and dir > 0 ? st : na, 'ST Düşüş', color = color.red, linewidth = 2, style = plot.style_linebr, force_overlay = true)
 
-// Fill (Doldurma) işlemi için orta bant (gizli)
+// Fill (Doldurma) işlemi için temel ST ve orta bant (çizgileri gizli tutulur)
+stPlot = plot(showInd ? st : na, 'ST Gizli Taban', display = display.none, force_overlay = true)
 midPlot = plot(showInd ? (open + close) / 2 : na, display = display.none, force_overlay = true)
 
 // Supertrend ve Fiyat Ortası Doldurma
