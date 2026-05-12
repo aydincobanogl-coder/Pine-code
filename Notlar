@@ -1,0 +1,97 @@
+# ==========================================
+# GÜNCELLENMİŞ YAPAY ZEKA VE SMC MOTORU (CONFLUENCE ODAKLI)
+# ==========================================
+def generate_smc_ai_analysis(df, sembol, tf, ham_sinyal=None):
+    if df is None or len(df) < 50: 
+        return "⚠️ Analiz için yeterli piyasa verisi bulunamadı."
+    
+    # --- 1. MATEMATİKSEL HESAPLAMALAR ---
+    c = df['close'].iloc[-1]
+    dec = 6 if c < 1 else 4 if c < 10 else 2
+    fmt = lambda x: f"{x:.{dec}f}"
+    
+    # HACİM 
+    hacim_durumu = "Normal Hacim"
+    ort_hacim = df['volume'].iloc[-25:-5].mean() 
+    if ort_hacim > 0:
+        for i in range(2, 7): 
+            hacim_carpani = df['volume'].iloc[-i] / ort_hacim
+            if hacim_carpani >= 2.5:
+                hacim_durumu = f"{hacim_carpani:.1f}x Hacim Patlaması"
+                break
+
+    # LİKİDİTE VE FVG (Mıknatıs Bölgeler)
+    likidite_durumu = "Yok"
+    eski_swing_high = df['high'].iloc[-55:-5].max()
+    eski_swing_low = df['low'].iloc[-55:-5].min()
+    
+    for i in range(2, 7):
+        if df['low'].iloc[-i] < eski_swing_low and df['close'].iloc[-i] > eski_swing_low:
+            likidite_durumu = f"Dip İğnesi: {fmt(df['low'].iloc[-i])}"
+            break
+        elif df['high'].iloc[-i] > eski_swing_high and df['close'].iloc[-i] < eski_swing_high:
+            likidite_durumu = f"Tepe İğnesi: {fmt(df['high'].iloc[-i])}"
+            break
+
+    fvg_durumu = "Yok"
+    for i in range(2, 12):
+        if len(df) > i+2:
+            alt_s, ust_s = df['high'].iloc[-i-2], df['low'].iloc[-i]
+            if ust_s > alt_s:
+                fvg_durumu = f"Bullish FVG ({fmt(alt_s)} - {fmt(ust_s)})"
+                break
+            alt_s_b, ust_s_b = df['high'].iloc[-i], df['low'].iloc[-i-2]
+            if alt_s_b < ust_s_b:
+                fvg_durumu = f"Bearish FVG ({fmt(alt_s_b)} - {fmt(ust_s_b)})"
+                break
+
+    # TEKNİK GÖSTERGELER
+    st_val = df['st'].iloc[-1] if 'st' in df.columns else 0
+    kama_val = df['kama'].iloc[-1] if 'kama' in df.columns else 0
+    rsi_ub = df['rsi_ub'].iloc[-1] if 'rsi_ub' in df.columns else 0
+    rsi_lb = df['rsi_lb'].iloc[-1] if 'rsi_lb' in df.columns else 0
+    
+    swing_high = df.tail(50)['high'].max()
+    swing_low = df.tail(50)['low'].min()
+
+    # --- SİNYAL METNİ ---
+    sinyal_metni = "Aktif bir otomatik sinyal yok."
+    if ham_sinyal in ["AL", "FBB"]:
+        sinyal_metni = f"🔥 ALGORİTMA '{ham_sinyal}' SİNYALİ ÜRETTİ."
+    elif ham_sinyal == "SAT":
+        sinyal_metni = f"🛑 ALGORİTMA 'SAT' SİNYALİ ÜRETTİ."
+
+    # --- 2. YAPAY ZEKA İSTEMİ (PROMPT) ---
+    prompt = f"""
+    Sen profesyonel bir algoritmik trade asistanısın. 
+    
+    VERİLER:
+    - Varlık: {sembol} | TF: {tf} | Fiyat: {fmt(c)}
+    - Sinyal: {sinyal_metni}
+    - Hacim: {hacim_durumu}
+    - İğne/Likidite: {likidite_durumu}
+    - FVG Boşluğu: {fvg_durumu}
+    - Seviyeler: ST({fmt(st_val)}), KAMA({fmt(kama_val)}), RSI_UB({fmt(rsi_ub)}), RSI_LB({fmt(rsi_lb)}), SwingHigh({fmt(swing_high)}), SwingLow({fmt(swing_low)})
+
+    KATI YAZIM VE ANALİZ KURALLARI:
+    1. GİRİŞ: DİREKT OLARAK "🎯 HIZLI ÖZET" başlığı ile başla. Selamlama yasak.
+    2. HIZLI ÖZET FORMATI: 
+       - Güncel Fiyat: [Fiyat]
+       - İşlem Yönü: [Yön]
+       - Giriş: [Seviye]
+       - Kâr Al: [Seviye]
+       - Stop: [Seviye]
+       (Eğer varlıkla ilgili çok ciddi/majör bir haber akışı varsa altına "📰 Haber: [1 kısa cümle]" ekle, yoksa bu satırı boş bırak.)
+
+    3. KESİŞİM (CONFLUENCE) ZORUNLULUĞU: Giriş (Entry) ve Kâr Al (TP) noktalarını belirlerken; hesaplanan FVG veya Likidite iğneleri EĞER RSI alt/üst bantları, KAMA veya SuperTrend seviyeleri ile ÇAKIŞIYORSA (birbirine çok yakınsa) bu bölgeyi "Yüksek Olasılıklı Bölge" olarak zorunlu kullan. Tek başına duran iğneleri ikinci planda tut.
+
+    4. ANALİZ DETAYLARI: "🔍 ANALİZ DETAYLARI" başlığı altında sadece madde işaretleri kullan. FVG/İğne ucu ile göstergelerin (RSI, KAMA, ST) nasıl bir kesişim oluşturduğunu teknik olarak açıkla.
+    
+    5. BİÇİMLENDİRME: Markdown (**) ASLA kullanma. Kalın metinler için sadece <b> ve </b> kullan. Kapanış cümlesi veya uyarı notu yazma.
+    """
+    
+    try:
+        response = ai_model.generate_content(prompt)
+        return response.text.replace("**", "<b>").replace("</b><b>", "</b>")
+    except Exception as e:
+        return f"🚨 Hata: {str(e)}"
