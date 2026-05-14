@@ -1,0 +1,39 @@
+//@version=5
+indicator("Momentum Velocity & Ratio Scaler", overlay=false, precision=2)
+
+// --- Parametreler ---
+rsiLen   = input.int(14, "RSI Periyodu")
+stochLen = input.int(14, "Stoch Periyodu")
+lookback = input.int(1, "Kıyaslanacak Bar Sayısı")
+
+// --- 1. Değişim Oranlarını Hesaplama (Normalization) ---
+priceDelta = (close - close[lookback]) / close[lookback] * 100
+
+rsiVal     = ta.rsi(close, rsiLen)
+rsiDelta   = (rsiVal - rsiVal[lookback]) 
+
+stochRsi   = ta.rsi(close, stochLen)
+stochK     = ta.sma(ta.stoch(stochRsi, stochRsi, stochRsi, stochLen), 3)
+stochDelta = (stochK - stochK[lookback])
+
+// --- 2. İlişki Katsayıları (Ratio) ---
+rsiRelativeSpeed   = math.abs(rsiDelta) / (math.abs(priceDelta) + 0.001)
+stochRelativeSpeed = math.abs(stochDelta) / (math.abs(priceDelta) + 0.001)
+
+// --- 3. Görselleştirme ---
+plot(priceDelta * 10, "Fiyat İvmesi (Ölçekli)", color=color.new(color.white, 0), style=plot.style_linebr, linewidth=2)
+plot(rsiDelta, "RSI İvmesi", color=color.new(color.purple, 0), style=plot.style_columns)
+plot(stochDelta, "Stoch %K İvmesi", color=color.new(color.yellow, 50), style=plot.style_area)
+
+// --- 4. Mantıksal Analiz Panosu ---
+var table alertTable = table.new(position.top_right, 2, 3, border_width = 1)
+if barstate.islast
+    // Koşul: Fiyat düşerken indikatörlerin çok sert artması (Ters Orantı + Yüksek İvme)
+    isDivergentUp = priceDelta < 0 and rsiDelta > 0 and stochDelta > 0
+    isExhausted   = math.abs(priceDelta * 10) > math.abs(rsiDelta) and priceDelta > 0
+    
+    table.cell(alertTable, 0, 0, "Durum:", bgcolor=color.gray)
+    table.cell(alertTable, 1, 0, isDivergentUp ? "GİZLİ GÜÇ (BOĞA)" : isExhausted ? "ŞİŞMİŞ FİYAT" : "NORMAL", bgcolor = isDivergentUp ? color.green : isExhausted ? color.red : color.black)
+    
+    table.cell(alertTable, 0, 1, "RSI/Fiyat Hız Oranı:", bgcolor=color.gray)
+    table.cell(alertTable, 1, 1, str.tostring(rsiRelativeSpeed, "#.##"), text_color=rsiRelativeSpeed > 2 ? color.lime : color.white)
