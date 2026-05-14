@@ -218,6 +218,6 @@ fill(h0, h1, color = color.new(color.purple, 95))
 // --- 5. KISIM: İŞARETLEYİCİLER (MARKERS) (ALT PANELE ÇİZİLİR) ---
 // =========================================================================
 // %K'nın 0 olduğu yerler (Aşırı Satım Dibinin Dibi)
-plotshape(k <= 0, title = 'Dip Seviye (0)', style = shape.diamond, location = location.bottom, color = color.blue, size = size.tiny)
+plotshape(k <= 0, title = 'Dip Seviye (0)', style = shape.circle, location = location.bottom, color = color.blue, size = size.tiny)
 // %K'nın 99 veya 100 olduğu yerler (Aşırı Alım Tepesi)
-plotshape(k >= 99, title = 'Tepe Seviye (99-100)', style = shape.diamond, location = location.top, color = color.orange, size = size.tiny)
+plotshape(k >= 99, title = 'Tepe Seviye (99-100)', style = shape.circle, location = location.top, color = color.orange, size = size.tiny)
