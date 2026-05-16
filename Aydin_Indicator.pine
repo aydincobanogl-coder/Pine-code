@@ -183,7 +183,7 @@ if barstate.islast
 // --- 3. KISIM: RSI (ALT PANELE ÇİZİLİR) ---
 // =========================================================================
 src = close
-len = input.int(14, minval = 1, title = 'RSI Length', group = 'RSI Ayarları')
+len = 14 // Input kaldırıldı, değer gömüldü
 up = ta.rma(math.max(ta.change(src), 0), len)
 down = ta.rma(-math.min(ta.change(src), 0), len)
 rsi_val = down == 0 ? 100 : up == 0 ? 0 : 100 - 100 / (1 + up / down)
@@ -197,15 +197,9 @@ fill(band1, band0, color = color.new(color.purple, 95))
 // =========================================================================
 // --- 4. KISIM: STOCHASTIC RSI (ALT PANELE ÇİZİLİR) ---
 // =========================================================================
-smoothK = input.int(3, minval = 1, title = 'K Smoothing', group = 'StochRSI Ayarları')
-smoothD = input.int(3, minval = 1, title = 'D Smoothing', group = 'StochRSI Ayarları')
-lengthRSI = input.int(14, minval = 1, title = 'StochRSI Length', group = 'StochRSI Ayarları')
-lengthStoch = input.int(14, minval = 1, title = 'Stoch Length', group = 'StochRSI Ayarları')
-srcsrsi = input.source(close, title = 'RSI Source', group = 'StochRSI Ayarları')
-
-rsi1 = ta.rsi(srcsrsi, lengthRSI)
-k = ta.sma(ta.stoch(rsi1, rsi1, rsi1, lengthStoch), smoothK)
-d_stoch = ta.sma(k, smoothD) // Aydın ile çakışmaması için ismi d_stoch yapıldı
+rsi1 = ta.rsi(close, 14)
+k = ta.sma(ta.stoch(rsi1, rsi1, rsi1, 14), 3)
+d_stoch = ta.sma(k, 3) // Aydın ile çakışmaması için ismi d_stoch yapıldı
 
 plot(k, color = color.blue, title = '%K')
 plot(d_stoch, color = color.orange, title = '%D')
@@ -217,7 +211,5 @@ fill(h0, h1, color = color.new(color.purple, 95))
 // =========================================================================
 // --- 5. KISIM: İŞARETLEYİCİLER (MARKERS) (ALT PANELE ÇİZİLİR) ---
 // =========================================================================
-// %K'nın 0 olduğu yerler (Aşırı Satım Dibinin Dibi)
-plotshape(k <= 0, title = 'Dip Seviye (0)', style = shape.circle, location = location.bottom, color = color.blue, size = size.tiny)
-// %K'nın 99 veya 100 olduğu yerler (Aşırı Alım Tepesi)
-plotshape(k >= 99, title = 'Tepe Seviye (99-100)', style = shape.circle, location = location.top, color = color.orange, size = size.tiny)
+plotshape(k <= 0, title = 'Dip Seviye (0)', style = shape.diamond, location = location.bottom, color = color.blue, size = size.tiny)
+plotshape(k >= 99, title = 'Tepe Seviye (99-100)', style = shape.diamond, location = location.top, color = color.orange, size = size.tiny)
