@@ -1,48 +1,37 @@
 //@version=6
 indicator(title = 'Aydın', shorttitle = 'Aydın', overlay = false)
-
 // =========================================================================
 // --- 1. KISIM: KAMA & SUPERTREND (ANA FİYAT GRAFİĞİNE ÇİZİLİR) ---
 // =========================================================================
 showInd = input.bool(true, 'KAMA_ST Göster/Gizle', group = 'KAMA & Supertrend Ayarları')
-
 // KAMA Hesaplama
 diff = math.abs(close - close[1])
 ER = math.sum(diff, 21) != 0 ? math.abs(close - close[21]) / math.sum(diff, 21) : 0
 sc = math.pow(ER * (0.666 - 0.0645) + 0.0645, 2)
 float kama = 0.0
 kama := nz(kama[1], close) + sc * (close - nz(kama[1], close))
-
 // Supertrend
 [st, dir] = ta.supertrend(3.0, 21)
-
 // --- Çizimler (force_overlay=true ile mumların üzerine basılır) ---
 plot(showInd ? kama : na, 'KAMA', color = color.blue, linewidth = 2, force_overlay = true)
-
 // Supertrend Çizgileri (Geçişlerde bağlantı olmaması için yönlere göre ayrıldı)
 plot(showInd and dir < 0 ? st : na, 'ST Yükseliş', color = color.green, linewidth = 2, style = plot.style_linebr, force_overlay = true)
 plot(showInd and dir > 0 ? st : na, 'ST Düşüş', color = color.red, linewidth = 2, style = plot.style_linebr, force_overlay = true)
-
 // Fill (Doldurma) işlemi için temel ST ve orta bant (çizgileri gizli tutulur)
 stPlot = plot(showInd ? st : na, 'ST Gizli Taban', display = display.none, force_overlay = true)
 midPlot = plot(showInd ? (open + close) / 2 : na, display = display.none, force_overlay = true)
-
 // Supertrend ve Fiyat Ortası Doldurma
 fill(midPlot, stPlot, color = dir < 0 ? color.new(color.green, 90) : color.new(color.red, 90))
-
-
 // =========================================================================
 // --- 2. KISIM: AYDIN İNDİKATÖRÜ (ANA FİYAT GRAFİĞİNE ÇİZİLİR) ---
 // =========================================================================
 ep = 2 * 14 - 1
 auc = ta.ema(math.max(close - close[1], 0), ep)
 adc = ta.ema(math.max(close[1] - close, 0), ep)
-
 x1 = 13 * (adc * 70 / 30 - auc)
 bU = x1 >= 0 ? close + x1 : close + x1 * 30 / 70
 x2 = 13 * (adc * 30 / 70 - auc)
 bL = x2 >= 0 ? close + x2 : close + x2 * 70 / 30
-
 f_lbl(float p, string t, color c) =>
     var line l = na
     var label lb = na
@@ -51,17 +40,14 @@ f_lbl(float p, string t, color c) =>
         // force_overlay = true EKLENDİ
         l := line.new(bar_index, p, bar_index+5, p, color=c, style=line.style_dashed, force_overlay=true)
         lb := label.new(bar_index+6, p, t+" "+str.tostring(p, format.mintick), color=color.white, textcolor=c, style=label.style_none, size=size.small, force_overlay=true)
-
 if barstate.islast
     f_lbl(bU, "RSI Üst", color.red)
     f_lbl(bL, "RSI Alt", color.green)
-
 // --- AL / SAT SİNYALİ MANTIĞI VE ZAMAN DİLİMLERİ ---
 grp_tf = "Sinyal Zaman Dilimi Ayarları"
 tf_al = input.timeframe("", title="Al Sinyali Zaman Dilimi", group=grp_tf, tooltip="Boş bırakılırsa mevcut grafiğin zaman dilimini kullanır.")
 tf_sat = input.timeframe("", title="Sat Sinyali Zaman Dilimi", group=grp_tf, tooltip="Boş bırakılırsa mevcut grafiğin zaman dilimini kullanır.")
 tf_fbb = input.timeframe("", title="FBB Sinyali Zaman Dilimi", group=grp_tf, tooltip="Boş bırakılırsa mevcut grafiğin zaman dilimini kullanır.")
-
 // Temel Sinyal Fonksiyonları
 f_sig() =>
     [st_sig, d_sig] = ta.supertrend(3.0, 21)
@@ -70,14 +56,12 @@ f_sig() =>
     nn = math.sum(math.abs(close - close[1]), 21)
     a := nz(a[1]) + math.pow((nn != 0 ? ns / nn : 0) * 0.6015 + 0.0645, 2) * (close - nz(a[1]))
     d_sig > 0 and ta.crossunder(st_sig, a) ? 1 : d_sig < 0 and ta.crossover(st_sig, a) ? -1 : 0
-
 calc_sig() =>
     bot = ta.vwma(hlc3, 200) - (3.0 * ta.stdev(hlc3, 200))
     bs = math.abs(close - open) > (ta.atr(200) * 0.1)
     br = close < open
     bl = close < bot
     (br and bl and bs) and (br[1] and bl[1] and bs[1])
-
 get_custom_tf_signal(string tf, string sigType) =>
     bool sig = false
     if tf == "" or timeframe.in_seconds(tf) == timeframe.in_seconds(timeframe.period)
@@ -105,27 +89,22 @@ get_custom_tf_signal(string tf, string sigType) =>
             arr = request.security_lower_tf(syminfo.tickerid, tf, calc_sig())
             sig := array.size(arr) > 0 and array.includes(arr, true)
     sig 
-
 al_sig = get_custom_tf_signal(tf_al, "AL")
 sat_sig = get_custom_tf_signal(tf_sat, "SAT")
 signal_exists = get_custom_tf_signal(tf_fbb, "FBB")
-
 // Şekilleri Çizdirme (force_overlay=true EKLENDİ)
 plotshape(al_sig, "Al", shape.triangleup, location.belowbar, color.green, size=size.tiny, force_overlay=true)
 plotshape(sat_sig, "Sat", shape.triangledown, location.abovebar, color.red, size=size.tiny, force_overlay=true)
 plotshape(signal_exists, "AL_FBB", shape.labelup, location.belowbar, color.orange, size=size.tiny, force_overlay=true)
-
 // --- ÇOKLU ZAMAN DİLİMİ ETİKETİ VE DİNAMİK ALARM ---
 var string latest_sig_text = ""
 var color latest_sig_color = na
 bool label_updated = false
-
 var int day_tracker = dayofmonth(time, "Europe/Istanbul")
 if dayofmonth(time, "Europe/Istanbul") != day_tracker
     latest_sig_text := "" 
     latest_sig_color := na
     day_tracker := dayofmonth(time, "Europe/Istanbul")
-
 al_1h = get_custom_tf_signal("60", "AL")
 sat_1h = get_custom_tf_signal("60", "SAT")
 fbb_1h = get_custom_tf_signal("60", "FBB")
@@ -135,10 +114,8 @@ fbb_4h = get_custom_tf_signal("240", "FBB")
 al_1d = get_custom_tf_signal("1D", "AL")
 sat_1d = get_custom_tf_signal("1D", "SAT")
 fbb_1d = get_custom_tf_signal("1D", "FBB")
-
 string new_sig = ""
 color new_col = na
-
 if al_1d
     new_sig := "1D: AL", new_col := color.green
 else if sat_1d
@@ -157,18 +134,14 @@ else if sat_1h
     new_sig := "1h: SAT", new_col := color.red
 else if fbb_1h
     new_sig := "1h: FBB", new_col := color.orange
-
 if new_sig != ""
     latest_sig_text := new_sig
     latest_sig_color := new_col
     label_updated := true
-
 if label_updated
     alert("" + syminfo.ticker + "-> " + latest_sig_text, alert.freq_once_per_bar)
-
 // Etiketi Çizdirme (force_overlay=true EKLENDİ)
 var label sig_label = label.new(x=bar_index, y=close, text="", style=label.style_label_left, force_overlay=true)
-
 if barstate.islast
     if latest_sig_text != ""
         label.set_xy(sig_label, bar_index + 3, close)
@@ -177,8 +150,6 @@ if barstate.islast
         label.set_textcolor(sig_label, latest_sig_color)
     else
         label.set_xy(sig_label, bar_index, na)
-
-
 // =========================================================================
 // --- 3. KISIM: RSI (ALT PANELE ÇİZİLİR) ---
 // =========================================================================
@@ -187,27 +158,21 @@ len = 14 // Input kaldırıldı, değer gömüldü
 up = ta.rma(math.max(ta.change(src), 0), len)
 down = ta.rma(-math.min(ta.change(src), 0), len)
 rsi_val = down == 0 ? 100 : up == 0 ? 0 : 100 - 100 / (1 + up / down)
-
 plot(rsi_val, color = color.fuchsia, linewidth = 2, title = 'RSI')
 band1 = hline(70, color = color.gray, linestyle = hline.style_dotted)
 band0 = hline(30, color = color.gray, linestyle = hline.style_dotted)
 fill(band1, band0, color = color.new(color.purple, 95))
-
-
 // =========================================================================
 // --- 4. KISIM: STOCHASTIC RSI (ALT PANELE ÇİZİLİR) ---
 // =========================================================================
 rsi1 = ta.rsi(close, 14)
 k = ta.sma(ta.stoch(rsi1, rsi1, rsi1, 14), 3)
 d_stoch = ta.sma(k, 3) // Aydın ile çakışmaması için ismi d_stoch yapıldı
-
 plot(k, color = color.blue, title = '%K')
 plot(d_stoch, color = color.orange, title = '%D')
 h0 = hline(80, color = color.gray, linestyle = hline.style_dotted)
 h1 = hline(20, color = color.gray, linestyle = hline.style_dotted)
 fill(h0, h1, color = color.new(color.purple, 95))
-
-
 // =========================================================================
 // --- 5. KISIM: İŞARETLEYİCİLER (MARKERS) (ALT PANELE ÇİZİLİR) ---
 // =========================================================================
